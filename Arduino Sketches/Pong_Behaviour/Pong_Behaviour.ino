@@ -22,7 +22,7 @@ void setup() {
     pinMode(playerTwoLed[i], OUTPUT);
   }
 }
-
+// Reset scores and display end-game specific LEDs
 void resetGame()
 {
   playerOneScore = 0;
@@ -30,7 +30,7 @@ void resetGame()
 
   endGameLeds();
 }
-
+// activate LEDs based on scores
 void updateLeds()
 {
   for(int i = 0; i < 3; i++)
@@ -46,7 +46,8 @@ void updateLeds()
       digitalWrite(playerTwoLed[i], LOW);
   }
 }
-
+// flash LEDs in a fancy way when the game ends
+// I am pretty sure I overcomplicated myself with this
 void endGameLeds()
 {
   for(int i = 0; i < 3; i++)
@@ -91,7 +92,7 @@ void loop() {
   if(Serial.available() > 0)
   {
     incomingByte = Serial.read();
-
+    // Get player positions
     if(incomingByte == 'P')
     {
 
@@ -105,6 +106,7 @@ void loop() {
       Serial.print("-");
       Serial.println(getPadded(playerTwoPosition));
     }
+    // Score for either 'L'eft or 'R'ight
     if(incomingByte == 'L' || incomingByte == 'R')
     {
       if(incomingByte == 'L')
@@ -119,15 +121,13 @@ void loop() {
       {
         resetGame();
       }
-      Serial.print(getPadded(playerOneScore));
-      Serial.print("-");
-      Serial.println(getPadded(playerTwoScore));
     }
+    // Reset game if needed
     if(incomingByte == 'Q')
     {
       resetGame();
     }
-
+    // Update LEDs at end of frame
     updateLeds(); 
   }
 }

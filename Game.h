@@ -2,6 +2,7 @@
 #include "SDL.h"
 #include <serial\serial.h>
 #include "SerialInterface.h"
+#include "Ball.h"
 #include <dos.h>
 
 class Game
@@ -19,18 +20,15 @@ public:
 	bool initSerialConnection();
 	bool running() { return isRunning; };
 
-	void setBallPaused(bool);
-
-	int checkCollision(SDL_Rect, SDL_Rect);
-
 private:
 	SDL_Window* mainWindow;
 	SDL_Renderer* mainRenderer;
 	bool isRunning;
 
+	int checkCollision(SDL_Rect, SDL_Rect);
+
 	int windowHeight; // used for clamping player movement
 	int windowWidth;
-	void resetBallPosition();
 
 	int p1Score, p2Score;
 
@@ -41,12 +39,14 @@ private:
 
 	SerialInterface* serial;
 
+	// I do not believe a separate class would have been necessarily needed for the players, given all we need is to send in movement commands
 	SDL_Rect playerPosition;
 	SDL_Rect player2Position;
 
-	SDL_Rect ballPosition;
-	int xVel = 3, yVel = 3;
-	int pausedXVel = 3, pausedYVel = 3;
+	// Given the nature of the ball, a separate class is used
+	Ball ball;
+	
+	// Multiplier used for increasing difficulty after each hit
 	float ballSpeedMultiplier = 1.0;
 };
 

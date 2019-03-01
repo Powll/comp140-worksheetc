@@ -27,22 +27,6 @@ bool Game::initSerialConnection()
 	return true;
 }
 
-void Game::setBallPaused(bool isPaused)
-{
-	if (isPaused == true)
-	{
-		pausedXVel = xVel;
-		pausedYVel = yVel;
-		xVel = 0;
-		yVel = 0;
-	}
-	else
-	{
-		xVel = pausedXVel;
-		yVel = pausedYVel;
-	}
-}
-
 int Game::checkCollision(SDL_Rect A, SDL_Rect Ball)
 {
 	// Rectangle sides
@@ -67,13 +51,12 @@ int Game::checkCollision(SDL_Rect A, SDL_Rect Ball)
 	{
 		if ((topB >= topA && topB <= bottomA) || (bottomB >= topA && bottomB <= bottomA))
 		{
-			return 2;
+			// Return 1 for collision
+			return 1;
 		}
 	}
 
-	// Return 1 for vertical collisions and 2 for horizontal ones
-
-	// If none of the sides of A are outside B
+	// Return 0 if no collision is detected
 	return 0;
 }
 
@@ -126,6 +109,7 @@ bool Game::init(const char * title, int xpos, int ypos, int width, int height, i
 
 	initSerialConnection();
 
+	// Setup players and ball
 	playerPosition.x = 100;
 	playerPosition.y = mapToScreen(serial->getPot1(), 0, 1023, 0, windowHeight - int(playerPosition.h));
 	playerPosition.w = 25;
@@ -136,10 +120,7 @@ bool Game::init(const char * title, int xpos, int ypos, int width, int height, i
 	player2Position.w = 25;
 	player2Position.h = 100;
 
-	ballPosition.x = width / 2;
-	ballPosition.y = height / 2;
-	ballPosition.w = 25;
-	ballPosition.h = 25;
+	ball.BallInit(25, 25, width / 2, height / 2, -1);
 
 	return true;
 }
@@ -157,20 +138,13 @@ void Game::render()
 
 	SDL_RenderFillRect(mainRenderer,&playerPosition);
 	SDL_RenderFillRect(mainRenderer,&player2Position);
-	SDL_RenderFillRect(mainRenderer, &ballPosition);
+	SDL_RenderFillRect(mainRenderer, &ball.getRect());
 	
 	// render new frame
 	SDL_RenderPresent(mainRenderer);
 }
 
-void Game::resetBallPosition()
-{
-	ballPosition.x = windowWidth / 2;
-	ballPosition.y = windowHeight / 2;
-	ballSpeedMultiplier = 1.0;
-}
-
-// By default, Arduino potensiometers return values between 0 and 1023 (inclusive)
+// By default, Arduino potensiometers return values between 0 and 1023 (inclusive) and therefore require mapping to the custom sized screen
 int Game::mapToScreen(int rawPosition, int minValue, int maxValue, int minScreen, int maxScreen)
 {
 	return minScreen + (int)(((float)(maxScreen - minScreen) / (float)(maxValue - minValue)) * (rawPosition - minValue));
@@ -178,11 +152,14 @@ int Game::mapToScreen(int rawPosition, int minValue, int maxValue, int minScreen
 
 void Game::resetGame()
 {
-	setBallPaused(true);
+	// Pause ball while controller displays 1 second worth of LED's flashing to mark the end of the game
+	ball.setBallPaused(true);
 	SDL_Delay(1000);
-	setBallPaused(false);
-	resetBallPosition();
+	ball.setBallPaused(false);
+	ball.invertXVel();
+	ball.resetBallPosition(windowWidth / 2, windowHeight / 2);
 
+	// Reset score
 	p1Score = 0;
 	p2Score = 0;
 
@@ -201,45 +178,42 @@ void Game::update()
 	playerPosition.y = mapToScreen(serial->getPot1(), 0, 1023, 0, windowHeight - int(playerPosition.h));
 	player2Position.y = mapToScreen(serial->getPot2(), 0, 1023, 0, windowHeight - int(playerPosition.h));
 
-	if (ballPosition.y <= 0 || ballPosition.y >= windowHeight - ballPosition.h)
+	// If ball hits either the top or the bottom of the screen ivert its y Velocity
+	if (ball.getRect().y <= 0 || ball.getRect().y >= windowHeight - ball.getRect().h)
 	{
-		yVel = -yVel;
+		ball.invertYVel();
 	}
-	if (ballPosition.x <= playerPosition.x + playerPosition.w - 1 || ballPosition.x >= player2Position.x + 1)
+	// If ball reaches "behind" the platforms it is considered a score for the other player
+	if (ball.getRect().x <= playerPosition.x + playerPosition.w - 1 || ball.getRect().x >= player2Position.x + 1)
 	{
-		if (xVel > 0)
+		if (ball.getXVel() > 0)
 		{
 			p1Score++;
-			if (p1Score == 3)
-			{
-				p1Score = 0;
-				p2Score = 0;
-			}
 			serial->score(-1);
 		}
 		else
 		{
 			p2Score++;
-			if (p2Score == 3)
-			{
-				p1Score = 0;
-				p2Score = 0;
-			}
 			serial->score(1);
 		}
-		resetBallPosition();
+		// Reset scores and ball position if game is won
+		if (p1Score == 3 || p2Score == 3)
+		{
+			p1Score = 0;
+			p2Score = 0;
+		}
+		ball.resetBallPosition(windowWidth / 2, windowHeight / 2);
 	}
 
-	if (checkCollision(playerPosition, ballPosition) > 0 || checkCollision(player2Position, ballPosition) > 0)
+	// check for collisions between platforms and ball
+	if (checkCollision(playerPosition, ball.getRect()) > 0 || checkCollision(player2Position, ball.getRect()) > 0)
 	{
-		xVel = -xVel;
+		ball.invertXVel();
 		ballSpeedMultiplier += 0.075;
 	}
 
-	ballPosition.x += (int)(xVel * ballSpeedMultiplier);
-	ballPosition.y += (int)(yVel * ballSpeedMultiplier);
-
-	std::cout << xVel << std::endl;
+	ball.moveX(ballSpeedMultiplier);
+	ball.moveY(ballSpeedMultiplier);
 }
 
 /*

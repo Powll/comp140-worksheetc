@@ -287,5 +287,5 @@ __pycache__/
 *.odx.cs
 *.xsd.cs
 
-!3rdParty/**
-!Libraries/**
+# Force inclusion of everything under Libraries (including binaries)
+!libraries/**
